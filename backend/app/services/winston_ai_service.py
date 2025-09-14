@@ -48,7 +48,7 @@ class WinstonAIService:
                 "params": {
                     "name": "ai-text-detection",
                     "arguments": {
-                        "text": text,
+                        "text": text.strip(),
                         "apiKey": self.api_key
                     }
                 }
@@ -80,7 +80,39 @@ class WinstonAIService:
                     return self._get_fallback_result("Invalid API response")
 
                 # Parse Winston AI response
-                return self._parse_winston_response(result["result"])
+                # The result might be wrapped in a content array
+                actual_result = result["result"]
+                logger.info(f"Winston AI raw result: {actual_result}")
+
+                if isinstance(actual_result, dict) and "content" in actual_result:
+                    # Extract the actual JSON from the content array
+                    content = actual_result["content"]
+                    logger.info(f"Winston AI content: {content}")
+
+                    if isinstance(content, list) and len(content) > 0:
+                        content_item = content[0]
+                        logger.info(f"Winston AI content item: {content_item}")
+
+                        if isinstance(content_item, dict) and "text" in content_item:
+                            import json
+                            try:
+                                json_text = content_item["text"]
+                                logger.info(f"Winston AI JSON text: {json_text[:200]}...")
+
+                                # Winston AI returns text with explanation + JSON
+                                # Extract JSON from the text (look for "Full API Response :")
+                                if "Full API Response :" in json_text:
+                                    json_start = json_text.find("Full API Response :") + len("Full API Response :")
+                                    json_text = json_text[json_start:].strip()
+
+                                actual_result = json.loads(json_text)
+                                logger.info(f"Parsed Winston AI result: {actual_result}")
+                            except json.JSONDecodeError as e:
+                                logger.error(f"Failed to parse Winston AI JSON response: {e}")
+                                logger.error(f"JSON text was: {json_text}")
+                                return self._get_fallback_result("Invalid JSON response from Winston AI")
+
+                return self._parse_winston_response(actual_result)
 
         except httpx.TimeoutException:
             logger.error("Winston AI API timeout")
@@ -92,8 +124,8 @@ class WinstonAIService:
     def _parse_winston_response(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """Parse Winston AI API response into our standard format"""
         try:
-            # Winston AI returns different response structure
-            # We need to adapt it to our expected format
+            # Winston AI returns a specific response structure
+            # Based on the actual API response format
             is_ai_generated = False
             confidence = 0.0
             detection_methods = []
@@ -101,33 +133,51 @@ class WinstonAIService:
 
             # Parse the actual detection result
             if isinstance(result, dict):
-                # Look for common Winston AI response fields
-                if "is_ai_generated" in result:
+                # Winston AI uses 'score' field: 0-100 range, where higher = more AI
+                if "score" in result:
+                    score = float(result["score"])
+                    # Winston AI returns percentage (0-100), convert to 0-1 range
+                    confidence = score / 100.0
+                    is_ai_generated = confidence > 0.5
+                elif "is_ai_generated" in result:
                     is_ai_generated = bool(result["is_ai_generated"])
                 elif "ai_probability" in result:
                     confidence = float(result["ai_probability"])
                     is_ai_generated = confidence > 0.5
-                elif "confidence" in result:
-                    confidence = float(result["confidence"])
-                    is_ai_generated = confidence > 0.5
 
-                # Extract confidence if available
-                if "confidence" in result:
+                # Extract confidence if not already set
+                if confidence == 0.0 and "confidence" in result:
                     confidence = float(result["confidence"])
-                elif "ai_probability" in result:
+                elif confidence == 0.0 and "ai_probability" in result:
                     confidence = float(result["ai_probability"])
 
                 # Extract detection methods/indicators
-                if "indicators" in result and isinstance(result["indicators"], list):
-                    detection_methods = [
-                        {"method": "winston_ai", "indicator": indicator}
-                        for indicator in result["indicators"]
-                    ]
-                elif "reasons" in result and isinstance(result["reasons"], list):
-                    detection_methods = [
-                        {"method": "winston_ai", "indicator": reason}
-                        for reason in result["reasons"]
-                    ]
+                if "sentences" in result and isinstance(result["sentences"], list):
+                    # Analyze sentence-level scores
+                    sentence_scores = [s.get("score", 0) for s in result["sentences"] if isinstance(s, dict)]
+                    if sentence_scores:
+                        avg_sentence_score = sum(sentence_scores) / len(sentence_scores)
+                        detection_methods.append({
+                            "method": "winston_ai",
+                            "indicator": f"Average sentence score: {avg_sentence_score:.2f}"
+                        })
+
+                # Add readability score as indicator
+                if "readability_score" in result:
+                    readability = float(result["readability_score"])
+                    detection_methods.append({
+                        "method": "winston_ai",
+                        "indicator": f"Readability score: {readability:.2f}"
+                    })
+
+                # Add attack detection indicators
+                if "attack_detected" in result and isinstance(result["attack_detected"], dict):
+                    attacks = [k for k, v in result["attack_detected"].items() if v]
+                    if attacks:
+                        detection_methods.append({
+                            "method": "winston_ai",
+                            "indicator": f"Attack patterns detected: {', '.join(attacks)}"
+                        })
 
                 # Generate recommendations based on confidence
                 if is_ai_generated and confidence > 0.7:

@@ -13,7 +13,7 @@ class ClaudeService:
         self.client = anthropic.Anthropic(api_key=settings.CLAUDE_API_KEY)
         self.model = settings.CLAUDE_MODEL
 
-    async def generate_response(
+    def generate_response(
         self,
         prompt: str,
         max_tokens: int = 1000,
@@ -21,13 +21,13 @@ class ClaudeService:
     ) -> str:
         """Generate a response using Claude API"""
         try:
-            response = self.client.messages.create(
+            response = self.client.completions.create(
                 model=self.model,
-                max_tokens=max_tokens,
+                max_tokens_to_sample=max_tokens,
                 temperature=temperature,
-                messages=[{"role": "user", "content": prompt}]
+                prompt=f"\n\nHuman: {prompt}\n\nAssistant:"
             )
-            return response.content[0].text
+            return response.completion
         except Exception as e:
             logger.error(f"Error generating Claude response: {e}")
             return "I'm sorry, I'm having trouble processing your request right now."
@@ -54,7 +54,7 @@ class ClaudeService:
         """
 
         try:
-            response = await self.generate_response(prompt, max_tokens=800)
+            response = self.generate_response(prompt, max_tokens=800)
             # Try to parse JSON response
             try:
                 return json.loads(response)
@@ -97,14 +97,14 @@ class ClaudeService:
         """
 
         try:
-            response = await self.generate_response(prompt, max_tokens=600)
+            response = self.generate_response(prompt, max_tokens=600)
             try:
                 return json.loads(response)
             except json.JSONDecodeError:
                 return {
                     "is_ai_generated": False,
                     "confidence": 0.3,
-                    "indicators": ["Unable to analyze properly"],
+                    "detection_methods": [{"method": "claude", "indicator": "Unable to analyze properly"}],
                     "recommendations": [{"action": "review", "reason": "Analysis inconclusive"}]
                 }
         except Exception as e:
@@ -112,7 +112,7 @@ class ClaudeService:
             return {
                 "is_ai_generated": False,
                 "confidence": 0.3,
-                "indicators": ["Analysis failed"],
+                "detection_methods": [{"method": "claude", "indicator": "Analysis failed"}],
                 "recommendations": [{"action": "review", "reason": "Analysis failed"}]
             }
 
@@ -140,7 +140,7 @@ class ClaudeService:
         )
 
         try:
-            response = await self.generate_response(prompt, max_tokens=2000, temperature=0.7)
+            response = self.generate_response(prompt, max_tokens=2000, temperature=0.7)
             try:
                 result = json.loads(response)
                 return self._validate_and_enhance_config(result, name, description, topics, moderation_style)
@@ -162,7 +162,7 @@ class ClaudeService:
         prompt = self._build_reddit_rules_prompt(topics, moderation_style, content_types, target_audience)
 
         try:
-            response = await self.generate_response(prompt, max_tokens=1500, temperature=0.6)
+            response = self.generate_response(prompt, max_tokens=1500, temperature=0.6)
             try:
                 result = json.loads(response)
                 return result.get("rules", [])
@@ -185,7 +185,7 @@ class ClaudeService:
         )
 
         try:
-            response = await self.generate_response(prompt, max_tokens=1200, temperature=0.7)
+            response = self.generate_response(prompt, max_tokens=1200, temperature=0.7)
             try:
                 result = json.loads(response)
                 return result.get("guidelines", {})
@@ -204,7 +204,7 @@ class ClaudeService:
         prompt = self._build_validation_prompt(config, original_request)
 
         try:
-            response = await self.generate_response(prompt, max_tokens=1000, temperature=0.5)
+            response = self.generate_response(prompt, max_tokens=1000, temperature=0.5)
             try:
                 result = json.loads(response)
                 return result.get("improved_config", config)
@@ -274,7 +274,7 @@ class ClaudeService:
         """
 
         try:
-            response = await self.generate_response(prompt, max_tokens=1200)
+            response = self.generate_response(prompt, max_tokens=1200)
             try:
                 result = json.loads(response)
                 # Add proper URLs to sources

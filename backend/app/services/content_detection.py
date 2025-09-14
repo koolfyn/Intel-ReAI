@@ -1,5 +1,4 @@
 from typing import Dict, Any
-from .claude_service import ClaudeService
 from .winston_ai_service import WinstonAIService
 import logging
 
@@ -7,7 +6,6 @@ logger = logging.getLogger(__name__)
 
 class ContentDetectionService:
     def __init__(self):
-        self.claude_service = ClaudeService()
         self.winston_ai_service = WinstonAIService()
 
     async def detect_content(
@@ -15,9 +13,9 @@ class ContentDetectionService:
         content: str,
         content_type: str = "post"
     ) -> Dict[str, Any]:
-        """Detect if content is AI-generated using Winston AI (primary) and Claude (fallback)"""
+        """Detect if content is AI-generated using Winston AI"""
         try:
-            # Try Winston AI first (more accurate for AI detection)
+            # Use Winston AI for AI detection
             winston_result = await self.winston_ai_service.detect_ai_text(content)
 
             if winston_result["source"] == "winston_ai":
@@ -25,11 +23,9 @@ class ContentDetectionService:
                 result = winston_result
                 logger.info(f"Winston AI detection: {winston_result['is_ai_generated']} (confidence: {winston_result['confidence']:.2f})")
             else:
-                # Winston AI failed, fallback to Claude
-                logger.warning(f"Winston AI failed: {winston_result['detection_methods'][0]['indicator']}, falling back to Claude")
-                claude_result = await self.claude_service.detect_ai_content(content)
-                result = claude_result
-                logger.info(f"Claude detection: {claude_result.get('is_ai_generated', False)} (confidence: {claude_result.get('confidence', 0.5):.2f})")
+                # Winston AI failed, use fallback
+                logger.warning(f"Winston AI failed: {winston_result['detection_methods'][0]['indicator']}, using fallback detection")
+                result = self._get_fallback_detection()
 
             # Ensure the result has the expected structure
             if not isinstance(result, dict):
@@ -59,21 +55,23 @@ class ContentDetectionService:
         if "confidence" not in result:
             result["confidence"] = 0.5
 
-        if "indicators" not in result or not isinstance(result["indicators"], list):
-            result["indicators"] = []
+        if "detection_methods" not in result or not isinstance(result["detection_methods"], list):
+            result["detection_methods"] = []
 
         if "recommendations" not in result or not isinstance(result["recommendations"], list):
             result["recommendations"] = []
 
         # Add additional analysis based on content characteristics
         additional_indicators = self._analyze_content_characteristics(content)
-        result["indicators"].extend(additional_indicators)
+        result["detection_methods"].extend([{"method": "content_analysis", "indicator": indicator} for indicator in additional_indicators])
 
         # Add content-type specific analysis
         if content_type == "post":
-            result["indicators"].extend(self._analyze_post_characteristics(content))
+            post_indicators = self._analyze_post_characteristics(content)
+            result["detection_methods"].extend([{"method": "post_analysis", "indicator": indicator} for indicator in post_indicators])
         elif content_type == "comment":
-            result["indicators"].extend(self._analyze_comment_characteristics(content))
+            comment_indicators = self._analyze_comment_characteristics(content)
+            result["detection_methods"].extend([{"method": "comment_analysis", "indicator": indicator} for indicator in comment_indicators])
 
         # Adjust confidence based on additional analysis
         result["confidence"] = self._adjust_confidence(result["confidence"], additional_indicators)
@@ -89,7 +87,7 @@ class ContentDetectionService:
         return {
             "is_ai_generated": False,
             "confidence": 0.3,
-            "indicators": ["Analysis failed - unable to determine"],
+            "detection_methods": [{"method": "fallback", "indicator": "Analysis failed - unable to determine"}],
             "recommendations": [{"action": "review", "reason": "Analysis inconclusive - manual review recommended"}]
         }
 
