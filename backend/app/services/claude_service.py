@@ -116,6 +116,104 @@ class ClaudeService:
                 "recommendations": [{"action": "review", "reason": "Analysis failed"}]
             }
 
+    async def generate_comprehensive_subreddit_config(
+        self,
+        name: str,
+        description: str,
+        topics: List[str],
+        moderation_style: str = "moderate",
+        brief_description: Optional[str] = None,
+        target_audience: Optional[str] = None,
+        content_types: Optional[List[str]] = None,
+        community_goals: Optional[str] = None,
+        moderation_philosophy: Optional[str] = None,
+        language: str = "en",
+        age_restriction: str = "all",
+        content_rating: str = "general"
+    ) -> Dict[str, Any]:
+        """Generate comprehensive subreddit configuration using enhanced prompts"""
+        prompt = self._build_comprehensive_config_prompt(
+            name, description, topics, moderation_style,
+            brief_description, target_audience, content_types,
+            community_goals, moderation_philosophy, language,
+            age_restriction, content_rating
+        )
+
+        try:
+            response = await self.generate_response(prompt, max_tokens=2000, temperature=0.7)
+            try:
+                result = json.loads(response)
+                return self._validate_and_enhance_config(result, name, description, topics, moderation_style)
+            except json.JSONDecodeError:
+                logger.warning("Claude returned invalid JSON, using fallback configuration")
+                return self._get_fallback_comprehensive_config(name, description, topics, moderation_style)
+        except Exception as e:
+            logger.error(f"Error generating comprehensive subreddit config: {e}")
+            return self._get_fallback_comprehensive_config(name, description, topics, moderation_style)
+
+    async def generate_reddit_style_rules(
+        self,
+        topics: List[str],
+        moderation_style: str,
+        content_types: Optional[List[str]] = None,
+        target_audience: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Generate Reddit-style community rules based on topics and moderation style"""
+        prompt = self._build_reddit_rules_prompt(topics, moderation_style, content_types, target_audience)
+
+        try:
+            response = await self.generate_response(prompt, max_tokens=1500, temperature=0.6)
+            try:
+                result = json.loads(response)
+                return result.get("rules", [])
+            except json.JSONDecodeError:
+                return self._get_fallback_rules(moderation_style)
+        except Exception as e:
+            logger.error(f"Error generating Reddit-style rules: {e}")
+            return self._get_fallback_rules(moderation_style)
+
+    async def generate_community_guidelines(
+        self,
+        topics: List[str],
+        moderation_style: str,
+        community_goals: Optional[str] = None,
+        moderation_philosophy: Optional[str] = None
+    ) -> Dict[str, str]:
+        """Generate detailed community guidelines"""
+        prompt = self._build_community_guidelines_prompt(
+            topics, moderation_style, community_goals, moderation_philosophy
+        )
+
+        try:
+            response = await self.generate_response(prompt, max_tokens=1200, temperature=0.7)
+            try:
+                result = json.loads(response)
+                return result.get("guidelines", {})
+            except json.JSONDecodeError:
+                return self._get_fallback_guidelines(moderation_style)
+        except Exception as e:
+            logger.error(f"Error generating community guidelines: {e}")
+            return self._get_fallback_guidelines(moderation_style)
+
+    async def validate_subreddit_config(
+        self,
+        config: Dict[str, Any],
+        original_request: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Validate and improve generated subreddit configuration"""
+        prompt = self._build_validation_prompt(config, original_request)
+
+        try:
+            response = await self.generate_response(prompt, max_tokens=1000, temperature=0.5)
+            try:
+                result = json.loads(response)
+                return result.get("improved_config", config)
+            except json.JSONDecodeError:
+                return config
+        except Exception as e:
+            logger.error(f"Error validating subreddit config: {e}")
+            return config
+
     async def generate_subreddit_config(
         self,
         name: str,
@@ -123,60 +221,13 @@ class ClaudeService:
         topics: List[str],
         moderation_style: str = "moderate"
     ) -> Dict[str, Any]:
-        """Generate subreddit configuration"""
-        prompt = f"""
-        Generate a complete subreddit configuration for:
-        - Name: {name}
-        - Description: {description}
-        - Topics: {', '.join(topics)}
-        - Moderation Style: {moderation_style}
-
-        Please provide a JSON response with:
-        1. "display_name": string
-        2. "description": string (enhanced version)
-        3. "rules": array of objects with "title", "description", "severity"
-        4. "moderation_guidelines": string
-        5. "auto_moderation_settings": object with boolean flags
-
-        Make it appropriate for the topics and moderation style.
-        """
-
-        try:
-            response = await self.generate_response(prompt, max_tokens=1000)
-            try:
-                return json.loads(response)
-            except json.JSONDecodeError:
-                # Fallback configuration
-                return {
-                    "display_name": name.title(),
-                    "description": description,
-                    "rules": [
-                        {"title": "Be respectful", "description": "Treat others with respect", "severity": "high"},
-                        {"title": "No spam", "description": "No spam or self-promotion", "severity": "high"},
-                        {"title": "Stay on topic", "description": "Keep discussions relevant", "severity": "medium"}
-                    ],
-                    "moderation_guidelines": "Moderate content based on community rules and reddiquette.",
-                    "auto_moderation_settings": {
-                        "auto_remove_spam": True,
-                        "require_approval": False,
-                        "content_filters": ["spam", "offensive"]
-                    }
-                }
-        except Exception as e:
-            logger.error(f"Error generating subreddit config: {e}")
-            return {
-                "display_name": name.title(),
-                "description": description,
-                "rules": [
-                    {"title": "Be respectful", "description": "Treat others with respect", "severity": "high"}
-                ],
-                "moderation_guidelines": "Moderate content appropriately.",
-                "auto_moderation_settings": {
-                    "auto_remove_spam": True,
-                    "require_approval": False,
-                    "content_filters": []
-                }
-            }
+        """Legacy method - now calls comprehensive config generation"""
+        return await self.generate_comprehensive_subreddit_config(
+            name=name,
+            description=description,
+            topics=topics,
+            moderation_style=moderation_style
+        )
 
     async def search_and_respond(
         self,
@@ -244,3 +295,372 @@ class ClaudeService:
                 "citations": [],
                 "sources": []
             }
+
+    def _build_comprehensive_config_prompt(
+        self,
+        name: str,
+        description: str,
+        topics: List[str],
+        moderation_style: str,
+        brief_description: Optional[str],
+        target_audience: Optional[str],
+        content_types: Optional[List[str]],
+        community_goals: Optional[str],
+        moderation_philosophy: Optional[str],
+        language: str,
+        age_restriction: str,
+        content_rating: str
+    ) -> str:
+        """Build comprehensive prompt for subreddit configuration"""
+        return f"""
+You are an expert Reddit community moderator and administrator with deep knowledge of Reddit's culture, best practices, and successful community management. Generate a comprehensive subreddit configuration based on the following information:
+
+**Basic Information:**
+- Subreddit Name: {name}
+- Description: {description}
+- Brief Description: {brief_description or "Not provided"}
+- Topics: {', '.join(topics) if topics else "General discussion"}
+- Target Audience: {target_audience or "General Reddit users"}
+- Community Goals: {community_goals or "Foster positive discussion and community"}
+- Moderation Philosophy: {moderation_philosophy or "Balanced approach to community management"}
+
+**Technical Specifications:**
+- Language: {language}
+- Age Restriction: {age_restriction}
+- Content Rating: {content_rating}
+- Allowed Content Types: {', '.join(content_types) if content_types else "All types"}
+
+**Moderation Style: {moderation_style}**
+
+Please generate a comprehensive JSON response with the following structure:
+
+{{
+  "display_name": "string - A friendly, readable name for the subreddit",
+  "description": "string - Enhanced, engaging description (2-3 sentences)",
+  "rules": [
+    {{
+      "title": "string - Clear, concise rule title",
+      "description": "string - Detailed explanation of the rule",
+      "severity": "string - low/medium/high/critical",
+      "category": "string - behavior/content/spam/safety/community",
+      "enforcement_level": "string - warning/removal/ban/mute",
+      "examples": ["string array - Specific examples of violations"],
+      "exceptions": "string - When this rule doesn't apply",
+      "rationale": "string - Why this rule is important for this community"
+    }}
+  ],
+  "moderation_guidelines": {{
+    "general_approach": "string - Overall moderation philosophy",
+    "content_standards": "string - What content is acceptable",
+    "user_behavior_expectations": "string - Expected user conduct",
+    "enforcement_strategy": "string - How rules will be enforced",
+    "appeal_process": "string - How users can appeal moderation actions"
+  }},
+  "auto_moderation_settings": {{
+    "auto_remove_spam": "boolean",
+    "require_approval": "boolean",
+    "content_filters": ["string array - Types of content to filter"],
+    "min_account_age_hours": "number - Minimum account age in hours",
+    "min_karma_required": "number - Minimum karma required",
+    "max_posts_per_hour": "number - Rate limiting",
+    "keyword_filters": ["string array - Banned keywords"],
+    "image_moderation": "boolean",
+    "link_validation": "boolean",
+    "duplicate_detection": "boolean"
+  }},
+  "community_settings": {{
+    "allow_images": "boolean",
+    "allow_videos": "boolean",
+    "allow_links": "boolean",
+    "allow_polls": "boolean",
+    "allow_live_chat": "boolean",
+    "post_approval_required": "boolean",
+    "comment_approval_required": "boolean",
+    "user_flair_enabled": "boolean",
+    "post_flair_enabled": "boolean",
+    "wiki_enabled": "boolean",
+    "events_enabled": "boolean"
+  }},
+  "suggested_tags": ["string array - Relevant tags for the community"],
+  "community_type": "string - discussion/support/hobby/professional/entertainment",
+  "estimated_activity_level": "string - low/medium/high/very_high",
+  "configuration_notes": "string - Additional notes about this configuration"
+}}
+
+**Important Guidelines:**
+1. Follow Reddit's official content policy and community guidelines
+2. Include Reddit-specific terminology and conventions
+3. Consider the target audience and community goals
+4. Balance freedom of expression with community safety
+5. Include both general Reddit rules and topic-specific rules
+6. Make rules clear, enforceable, and fair
+7. Consider the moderation style when setting enforcement levels
+8. Include examples and rationale for complex rules
+9. Ensure the configuration promotes healthy community growth
+
+Generate a configuration that would work well for a real Reddit community with these characteristics.
+"""
+
+    def _build_reddit_rules_prompt(
+        self,
+        topics: List[str],
+        moderation_style: str,
+        content_types: Optional[List[str]],
+        target_audience: Optional[str]
+    ) -> str:
+        """Build prompt for generating Reddit-style rules"""
+        return f"""
+You are an expert Reddit moderator. Generate comprehensive community rules for a subreddit with the following characteristics:
+
+**Community Details:**
+- Topics: {', '.join(topics) if topics else "General discussion"}
+- Moderation Style: {moderation_style}
+- Content Types: {', '.join(content_types) if content_types else "All types"}
+- Target Audience: {target_audience or "General Reddit users"}
+
+Generate a JSON response with a "rules" array. Each rule should have:
+- title: Clear, concise rule title
+- description: Detailed explanation
+- severity: low/medium/high/critical
+- category: behavior/content/spam/safety/community
+- enforcement_level: warning/removal/ban/mute
+- examples: Array of specific examples
+- exceptions: When the rule doesn't apply
+- rationale: Why this rule is important
+
+Include:
+1. Core Reddit rules (be respectful, no spam, etc.)
+2. Topic-specific rules based on the community focus
+3. Content type rules based on allowed content
+4. Moderation style appropriate enforcement levels
+5. Community-specific rules that make sense for the audience
+
+Make rules practical, enforceable, and fair. Include examples and clear rationale.
+"""
+
+    def _build_community_guidelines_prompt(
+        self,
+        topics: List[str],
+        moderation_style: str,
+        community_goals: Optional[str],
+        moderation_philosophy: Optional[str]
+    ) -> str:
+        """Build prompt for generating community guidelines"""
+        return f"""
+You are an expert Reddit community manager. Generate detailed moderation guidelines for a subreddit with:
+
+**Community Details:**
+- Topics: {', '.join(topics) if topics else "General discussion"}
+- Moderation Style: {moderation_style}
+- Community Goals: {community_goals or "Foster positive discussion"}
+- Moderation Philosophy: {moderation_philosophy or "Balanced approach"}
+
+Generate a JSON response with "guidelines" object containing:
+- general_approach: Overall moderation philosophy
+- content_standards: What content is acceptable
+- user_behavior_expectations: Expected user conduct
+- enforcement_strategy: How rules will be enforced
+- appeal_process: How users can appeal actions
+
+Make guidelines clear, fair, and practical for moderators to follow.
+"""
+
+    def _build_validation_prompt(
+        self,
+        config: Dict[str, Any],
+        original_request: Dict[str, Any]
+    ) -> str:
+        """Build prompt for validating and improving configuration"""
+        return f"""
+You are a Reddit community expert. Review and improve this subreddit configuration:
+
+**Original Request:**
+{json.dumps(original_request, indent=2)}
+
+**Generated Configuration:**
+{json.dumps(config, indent=2)}
+
+Please provide a JSON response with "improved_config" containing the enhanced configuration. Look for:
+1. Missing important rules or settings
+2. Inconsistencies between rules and moderation style
+3. Unclear or unenforceable rules
+4. Missing community-specific considerations
+5. Opportunities to improve clarity and fairness
+
+Make improvements while maintaining the original intent and community focus.
+"""
+
+    def _validate_and_enhance_config(
+        self,
+        config: Dict[str, Any],
+        name: str,
+        description: str,
+        topics: List[str],
+        moderation_style: str
+    ) -> Dict[str, Any]:
+        """Validate and enhance the generated configuration"""
+        # Ensure required fields exist
+        if "display_name" not in config:
+            config["display_name"] = name.title()
+
+        if "description" not in config:
+            config["description"] = description
+
+        # Ensure rules have required fields
+        if "rules" in config and isinstance(config["rules"], list):
+            for rule in config["rules"]:
+                if "severity" not in rule:
+                    rule["severity"] = "medium"
+                if "category" not in rule:
+                    rule["category"] = "community"
+                if "enforcement_level" not in rule:
+                    rule["enforcement_level"] = "warning"
+
+        return config
+
+    def _get_fallback_comprehensive_config(
+        self,
+        name: str,
+        description: str,
+        topics: List[str],
+        moderation_style: str
+    ) -> Dict[str, Any]:
+        """Get fallback comprehensive configuration"""
+        return {
+            "display_name": name.title(),
+            "description": description,
+            "rules": self._get_fallback_rules(moderation_style),
+            "moderation_guidelines": self._get_fallback_guidelines(moderation_style),
+            "auto_moderation_settings": self._get_fallback_auto_mod_settings(moderation_style),
+            "community_settings": self._get_fallback_community_settings(),
+            "suggested_tags": topics[:5] if topics else ["discussion"],
+            "community_type": "discussion",
+            "estimated_activity_level": "medium",
+            "configuration_notes": "Generated using fallback configuration due to AI service issues."
+        }
+
+    def _get_fallback_rules(self, moderation_style: str) -> List[Dict[str, Any]]:
+        """Get fallback rules based on moderation style"""
+        base_rules = [
+            {
+                "title": "Be respectful",
+                "description": "Treat others with respect and civility. No personal attacks, harassment, or hate speech.",
+                "severity": "high",
+                "category": "behavior",
+                "enforcement_level": "warning",
+                "examples": ["Personal attacks", "Harassment", "Hate speech"],
+                "exceptions": "Constructive criticism is allowed",
+                "rationale": "Maintains a welcoming environment for all community members"
+            },
+            {
+                "title": "No spam or self-promotion",
+                "description": "No spam, excessive self-promotion, or off-topic content. Follow Reddit's 9:1 rule.",
+                "severity": "high",
+                "category": "spam",
+                "enforcement_level": "removal",
+                "examples": ["Repeated promotional posts", "Off-topic content", "Excessive self-promotion"],
+                "exceptions": "Relevant self-promotion with community value",
+                "rationale": "Prevents spam and maintains content quality"
+            },
+            {
+                "title": "Stay on topic",
+                "description": "Keep discussions relevant to the subreddit's purpose and topics.",
+                "severity": "medium",
+                "category": "content",
+                "enforcement_level": "warning",
+                "examples": ["Off-topic posts", "Unrelated discussions"],
+                "exceptions": "Meta discussions about the subreddit itself",
+                "rationale": "Maintains focus and community identity"
+            }
+        ]
+
+        if moderation_style == "strict":
+            base_rules.extend([
+                {
+                    "title": "No low-effort posts",
+                    "description": "Posts must be substantial and well-thought-out. No simple questions or low-effort content.",
+                    "severity": "medium",
+                    "category": "content",
+                    "enforcement_level": "removal",
+                    "examples": ["Simple yes/no questions", "One-word posts", "Low-effort memes"],
+                    "exceptions": "High-quality simple posts with community value",
+                    "rationale": "Maintains high content quality standards"
+                }
+            ])
+
+        return base_rules
+
+    def _get_fallback_guidelines(self, moderation_style: str) -> Dict[str, str]:
+        """Get fallback moderation guidelines"""
+        if moderation_style == "strict":
+            return {
+                "general_approach": "Moderate content strictly according to community rules. Maintain high standards and remove low-quality content.",
+                "content_standards": "Only high-quality, substantial content is allowed. No low-effort posts or simple questions.",
+                "user_behavior_expectations": "Users should contribute meaningfully and follow all rules strictly.",
+                "enforcement_strategy": "Remove violations immediately. Issue warnings for minor infractions, bans for repeated violations.",
+                "appeal_process": "Users can appeal moderation actions by messaging moderators with a clear explanation of why the action was incorrect."
+            }
+        elif moderation_style == "lenient":
+            return {
+                "general_approach": "Moderate with a light touch. Focus on removing harmful content while allowing diverse opinions.",
+                "content_standards": "Most content is allowed as long as it's not harmful or spam. Encourage creativity and discussion.",
+                "user_behavior_expectations": "Be respectful and constructive. Diverse opinions are welcome.",
+                "enforcement_strategy": "Only remove clearly harmful content. Use warnings for minor issues.",
+                "appeal_process": "Users can easily appeal actions through modmail. Most appeals will be considered favorably."
+            }
+        else:  # moderate
+            return {
+                "general_approach": "Balance between maintaining quality and allowing diverse discussions. Moderate fairly according to community rules.",
+                "content_standards": "Content should be relevant and contribute to discussion. Some low-effort content may be allowed if it adds value.",
+                "user_behavior_expectations": "Be respectful and constructive. Follow community rules and Reddiquette.",
+                "enforcement_strategy": "Remove clear violations. Use warnings for minor issues, escalate for repeated violations.",
+                "appeal_process": "Users can appeal actions through modmail. Appeals will be reviewed fairly and promptly."
+            }
+
+    def _get_fallback_auto_mod_settings(self, moderation_style: str) -> Dict[str, Any]:
+        """Get fallback auto-moderation settings"""
+        base_settings = {
+            "auto_remove_spam": True,
+            "require_approval": False,
+            "content_filters": ["spam", "offensive"],
+            "min_account_age_hours": 0,
+            "min_karma_required": 0,
+            "max_posts_per_hour": 10,
+            "keyword_filters": [],
+            "image_moderation": False,
+            "link_validation": True,
+            "duplicate_detection": True
+        }
+
+        if moderation_style == "strict":
+            base_settings.update({
+                "require_approval": True,
+                "min_account_age_hours": 24,
+                "min_karma_required": 10,
+                "max_posts_per_hour": 5,
+                "content_filters": ["spam", "offensive", "low_effort"],
+                "image_moderation": True
+            })
+        elif moderation_style == "lenient":
+            base_settings.update({
+                "content_filters": ["spam"],
+                "max_posts_per_hour": 20
+            })
+
+        return base_settings
+
+    def _get_fallback_community_settings(self) -> Dict[str, bool]:
+        """Get fallback community settings"""
+        return {
+            "allow_images": True,
+            "allow_videos": True,
+            "allow_links": True,
+            "allow_polls": True,
+            "allow_live_chat": False,
+            "post_approval_required": False,
+            "comment_approval_required": False,
+            "user_flair_enabled": True,
+            "post_flair_enabled": True,
+            "wiki_enabled": True,
+            "events_enabled": False
+        }

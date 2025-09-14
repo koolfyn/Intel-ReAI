@@ -44,13 +44,69 @@ class AutoConfigRequest(BaseModel):
     description: str
     topics: List[str]
     moderation_style: str = "moderate"  # "strict", "moderate", "lenient"
+    # Enhanced fields for better configuration
+    brief_description: Optional[str] = None  # User's initial brief description
+    target_audience: Optional[str] = None  # Who the subreddit is for
+    content_types: Optional[List[str]] = None  # Allowed content types (text, image, link, video, etc.)
+    community_goals: Optional[str] = None  # What the community aims to achieve
+    moderation_philosophy: Optional[str] = None  # User's preferred approach to moderation
+    language: Optional[str] = "en"  # Primary language of the community
+    age_restriction: Optional[str] = "all"  # "all", "13+", "18+", "21+"
+    content_rating: Optional[str] = "general"  # "general", "mature", "adult"
+
+class RuleItem(BaseModel):
+    title: str
+    description: str
+    severity: str  # "low", "medium", "high", "critical"
+    category: str  # "behavior", "content", "spam", "safety", "community"
+    enforcement_level: str  # "warning", "removal", "ban", "mute"
+    examples: Optional[List[str]] = None
+    exceptions: Optional[str] = None
+    rationale: Optional[str] = None
+
+class ModerationGuidelines(BaseModel):
+    general_approach: str
+    content_standards: str
+    user_behavior_expectations: str
+    enforcement_strategy: str
+    appeal_process: str
+
+class AutoModerationSettings(BaseModel):
+    auto_remove_spam: bool
+    require_approval: bool
+    content_filters: List[str]
+    min_account_age_hours: int
+    min_karma_required: int
+    max_posts_per_hour: int
+    keyword_filters: List[str]
+    image_moderation: bool
+    link_validation: bool
+    duplicate_detection: bool
+
+class CommunitySettings(BaseModel):
+    allow_images: bool
+    allow_videos: bool
+    allow_links: bool
+    allow_polls: bool
+    allow_live_chat: bool
+    post_approval_required: bool
+    comment_approval_required: bool
+    user_flair_enabled: bool
+    post_flair_enabled: bool
+    wiki_enabled: bool
+    events_enabled: bool
 
 class AutoConfigResponse(BaseModel):
     display_name: str
     description: str
-    rules: List[dict]
-    moderation_guidelines: str
-    auto_moderation_settings: dict
+    rules: List[RuleItem]
+    moderation_guidelines: ModerationGuidelines
+    auto_moderation_settings: AutoModerationSettings
+    community_settings: CommunitySettings
+    suggested_tags: List[str]
+    community_type: str  # "discussion", "support", "hobby", "professional", "entertainment"
+    estimated_activity_level: str  # "low", "medium", "high", "very_high"
+    configuration_notes: Optional[str] = None
 
 class ContentDetectionRequest(BaseModel):
     content: str
@@ -107,7 +163,15 @@ async def auto_configure_subreddit(
             name=request.name,
             description=request.description,
             topics=request.topics,
-            moderation_style=request.moderation_style
+            moderation_style=request.moderation_style,
+            brief_description=request.brief_description,
+            target_audience=request.target_audience,
+            content_types=request.content_types,
+            community_goals=request.community_goals,
+            moderation_philosophy=request.moderation_philosophy,
+            language=request.language,
+            age_restriction=request.age_restriction,
+            content_rating=request.content_rating
         )
         return AutoConfigResponse(**result)
     except Exception as e:

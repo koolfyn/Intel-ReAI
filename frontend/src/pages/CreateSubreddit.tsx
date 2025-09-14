@@ -205,17 +205,34 @@ const CreateSubreddit: React.FC = () => {
 
                 <div>
                   <h4 className="font-medium text-blue-900 mb-2">Generated Rules:</h4>
-                  <ul className="list-disc list-inside space-y-1 text-blue-800">
+                  <ul className="list-disc list-inside space-y-2 text-blue-800">
                     {autoConfig.rules.map((rule, index) => (
-                      <li key={index}>
-                        <strong>{rule.title}:</strong> {rule.description}
-                        <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
-                          rule.severity === 'high' ? 'bg-red-100 text-red-800' :
-                          rule.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {rule.severity}
-                        </span>
+                      <li key={index} className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <strong>{rule.title}:</strong>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            rule.severity === 'critical' ? 'bg-red-100 text-red-800' :
+                            rule.severity === 'high' ? 'bg-red-100 text-red-800' :
+                            rule.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {rule.severity}
+                          </span>
+                          <span className={`px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700`}>
+                            {rule.category}
+                          </span>
+                        </div>
+                        <p className="text-sm ml-4">{rule.description}</p>
+                        {rule.examples && rule.examples.length > 0 && (
+                          <div className="ml-4 text-xs text-gray-600">
+                            <strong>Examples:</strong> {rule.examples.join(', ')}
+                          </div>
+                        )}
+                        {rule.rationale && (
+                          <div className="ml-4 text-xs text-gray-600">
+                            <strong>Rationale:</strong> {rule.rationale}
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -223,7 +240,28 @@ const CreateSubreddit: React.FC = () => {
 
                 <div>
                   <h4 className="font-medium text-blue-900 mb-2">Moderation Guidelines:</h4>
-                  <p className="text-blue-800 text-sm">{autoConfig.moderation_guidelines}</p>
+                  <div className="space-y-3 text-blue-800 text-sm">
+                    <div>
+                      <strong>General Approach:</strong>
+                      <p className="ml-2">{autoConfig.moderation_guidelines.general_approach}</p>
+                    </div>
+                    <div>
+                      <strong>Content Standards:</strong>
+                      <p className="ml-2">{autoConfig.moderation_guidelines.content_standards}</p>
+                    </div>
+                    <div>
+                      <strong>User Behavior Expectations:</strong>
+                      <p className="ml-2">{autoConfig.moderation_guidelines.user_behavior_expectations}</p>
+                    </div>
+                    <div>
+                      <strong>Enforcement Strategy:</strong>
+                      <p className="ml-2">{autoConfig.moderation_guidelines.enforcement_strategy}</p>
+                    </div>
+                    <div>
+                      <strong>Appeal Process:</strong>
+                      <p className="ml-2">{autoConfig.moderation_guidelines.appeal_process}</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -237,6 +275,50 @@ const CreateSubreddit: React.FC = () => {
                         </span>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-blue-900 mb-2">Community Settings:</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-blue-800">
+                    {Object.entries(autoConfig.community_settings).map(([key, value]) => (
+                      <div key={key} className="flex justify-between">
+                        <span className="capitalize">{key.replace(/_/g, ' ')}:</span>
+                        <span className="font-medium">
+                          {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-blue-900 mb-2">Additional Information:</h4>
+                  <div className="space-y-2 text-sm text-blue-800">
+                    <div>
+                      <strong>Community Type:</strong> {autoConfig.community_type}
+                    </div>
+                    <div>
+                      <strong>Estimated Activity Level:</strong> {autoConfig.estimated_activity_level}
+                    </div>
+                    {autoConfig.suggested_tags.length > 0 && (
+                      <div>
+                        <strong>Suggested Tags:</strong>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {autoConfig.suggested_tags.map((tag, index) => (
+                            <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {autoConfig.configuration_notes && (
+                      <div>
+                        <strong>Configuration Notes:</strong>
+                        <p className="ml-2 text-gray-600">{autoConfig.configuration_notes}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
