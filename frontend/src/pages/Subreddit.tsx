@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import PostCard from '../components/posts/PostCard';
 import CreatePost from '../components/posts/CreatePost';
-import AICompanion from '../components/ai/AICompanion';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { postsApi, subredditsApi, aiApi } from '../services/api';
 import { Post, Subreddit as SubredditType } from '../types';
@@ -181,9 +180,6 @@ const Subreddit: React.FC = () => {
 
         {/* Right Sidebar */}
         <div className="lg:col-span-1 space-y-6">
-          {/* AI Companion */}
-          <AICompanion subredditId={subreddit.id} subredditName={subreddit.name} />
-
           {/* FAQ */}
           {faq.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-lg p-4">

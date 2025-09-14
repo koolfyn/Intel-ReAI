@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PostCard from '../components/posts/PostCard';
 import CreatePost from '../components/posts/CreatePost';
-import AICompanion from '../components/ai/AICompanion';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { postsApi, subredditsApi } from '../services/api';
 import { Post, Subreddit } from '../types';
@@ -165,9 +164,6 @@ const Home: React.FC = () => {
 
         {/* Right Sidebar */}
         <div className="lg:col-span-1 space-y-6">
-          {/* AI Companion */}
-          <AICompanion />
-
           {/* Popular Subreddits */}
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
