@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Fix Test</title>
+</head>
+<body>
+    <h1>API Fix Test</h1>
+    <button onclick="testAPI()">Test API with Proxy</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            try {
+                // Test the proxy route
+                const response = await fetch('/api/v1/posts/?page=1&limit=3&sort=hot');
+                const data = await response.json();
+                document.getElementById('result').innerHTML = `
+                    <h2>API Response (via proxy):</h2>
+                    <p>Status: ${response.status}</p>
+                    <p>Posts count: ${data.posts ? data.posts.length : 'No posts'}</p>
+                    <h3>First few posts:</h3>
+                    <ul>
+                        ${data.posts ? data.posts.slice(0, 3).map(post =>
+                            `<li><strong>${post.title}</strong> by u/${post.author.username} in r/${post.subreddit.name}</li>`
+                        ).join('') : '<li>No posts found</li>'}
+                    </ul>
+                `;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <h2>Error:</h2>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
