@@ -1,5 +1,6 @@
 from typing import Dict, Any
 from .claude_service import ClaudeService
+from .winston_ai_service import WinstonAIService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -7,15 +8,28 @@ logger = logging.getLogger(__name__)
 class ContentDetectionService:
     def __init__(self):
         self.claude_service = ClaudeService()
+        self.winston_ai_service = WinstonAIService()
 
     async def detect_content(
         self,
         content: str,
         content_type: str = "post"
     ) -> Dict[str, Any]:
-        """Detect if content is AI-generated using Claude"""
+        """Detect if content is AI-generated using Winston AI (primary) and Claude (fallback)"""
         try:
-            result = await self.claude_service.detect_ai_content(content)
+            # Try Winston AI first (more accurate for AI detection)
+            winston_result = await self.winston_ai_service.detect_ai_text(content)
+
+            if winston_result["source"] == "winston_ai":
+                # Winston AI succeeded, use its result
+                result = winston_result
+                logger.info(f"Winston AI detection: {winston_result['is_ai_generated']} (confidence: {winston_result['confidence']:.2f})")
+            else:
+                # Winston AI failed, fallback to Claude
+                logger.warning(f"Winston AI failed: {winston_result['detection_methods'][0]['indicator']}, falling back to Claude")
+                claude_result = await self.claude_service.detect_ai_content(content)
+                result = claude_result
+                logger.info(f"Claude detection: {claude_result.get('is_ai_generated', False)} (confidence: {claude_result.get('confidence', 0.5):.2f})")
 
             # Ensure the result has the expected structure
             if not isinstance(result, dict):

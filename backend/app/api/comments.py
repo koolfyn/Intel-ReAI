@@ -4,10 +4,17 @@ from sqlalchemy import desc
 from typing import List, Optional
 from ..database import get_db
 from ..models import Comment, Post, User
+from ..services.content_detection import ContentDetectionService
 from pydantic import BaseModel
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Initialize content detection service
+content_detection_service = ContentDetectionService()
 
 class CommentResponse(BaseModel):
     id: int
@@ -70,7 +77,7 @@ async def create_comment(
     comment_data: CommentCreate,
     db: Session = Depends(get_db)
 ):
-    """Create a new comment"""
+    """Create a new comment with automatic AI detection"""
     # Verify post exists
     post = db.query(Post).filter(Post.id == post_id).first()
     if not post:
@@ -87,11 +94,22 @@ async def create_comment(
     if not author:
         raise HTTPException(status_code=500, detail="No users found in database")
 
+    # Perform AI detection on the comment content
+    logger.info(f"Performing AI detection on comment content (length: {len(comment_data.content)})")
+    ai_detection_result = await content_detection_service.detect_content(
+        content=comment_data.content,
+        content_type="comment"
+    )
+
+    logger.info(f"AI detection result: {ai_detection_result['is_ai_generated']} (confidence: {ai_detection_result['confidence']:.2f})")
+
     comment = Comment(
         content=comment_data.content,
         author_id=author.id,
         post_id=post_id,
-        parent_id=comment_data.parent_id
+        parent_id=comment_data.parent_id,
+        is_ai_generated=ai_detection_result["is_ai_generated"],
+        ai_confidence=int(ai_detection_result["confidence"] * 100)  # Convert to 0-100 scale
     )
 
     db.add(comment)

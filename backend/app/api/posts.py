@@ -4,10 +4,17 @@ from sqlalchemy import desc, asc
 from typing import List, Optional
 from ..database import get_db
 from ..models import Post, User, Subreddit
+from ..services.content_detection import ContentDetectionService
 from pydantic import BaseModel
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Initialize content detection service
+content_detection_service = ContentDetectionService()
 
 class PostResponse(BaseModel):
     id: int
@@ -136,7 +143,7 @@ async def get_post(post_id: int, db: Session = Depends(get_db)):
 
 @router.post("/posts/", response_model=PostResponse)
 async def create_post(post_data: PostCreate, db: Session = Depends(get_db)):
-    """Create a new post"""
+    """Create a new post with automatic AI detection"""
     # Verify subreddit exists
     subreddit = db.query(Subreddit).filter(Subreddit.id == post_data.subreddit_id).first()
     if not subreddit:
@@ -147,12 +154,23 @@ async def create_post(post_data: PostCreate, db: Session = Depends(get_db)):
     if not author:
         raise HTTPException(status_code=500, detail="No users found in database")
 
+    # Perform AI detection on the content
+    logger.info(f"Performing AI detection on post content (length: {len(post_data.content)})")
+    ai_detection_result = await content_detection_service.detect_content(
+        content=post_data.content,
+        content_type="post"
+    )
+
+    logger.info(f"AI detection result: {ai_detection_result['is_ai_generated']} (confidence: {ai_detection_result['confidence']:.2f})")
+
     post = Post(
         title=post_data.title,
         content=post_data.content,
         post_type=post_data.post_type,
         author_id=author.id,
-        subreddit_id=post_data.subreddit_id
+        subreddit_id=post_data.subreddit_id,
+        is_ai_generated=ai_detection_result["is_ai_generated"],
+        ai_confidence=int(ai_detection_result["confidence"] * 100)  # Convert to 0-100 scale
     )
 
     db.add(post)

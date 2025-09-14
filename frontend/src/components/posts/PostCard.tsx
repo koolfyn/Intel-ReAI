@@ -80,8 +80,14 @@ const PostCard: React.FC<PostCardProps> = ({ post, onVote }) => {
             <span>•</span>
             <span>{formatTimeAgo(post.created_at)}</span>
             {post.is_ai_generated && (
-              <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
-                AI Generated
+              <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full flex items-center space-x-1">
+                <span>🤖</span>
+                <span>AI Generated</span>
+                {post.ai_confidence && (
+                  <span className="text-yellow-600">
+                    ({post.ai_confidence}%)
+                  </span>
+                )}
               </span>
             )}
           </div>
@@ -99,6 +105,14 @@ const PostCard: React.FC<PostCardProps> = ({ post, onVote }) => {
               ? `${post.content.substring(0, 200)}...`
               : post.content
             }
+            {post.is_ai_generated && (
+              <div className="mt-2 p-2 bg-yellow-50 border-l-4 border-yellow-400 rounded-r">
+                <p className="text-xs text-yellow-800 flex items-center space-x-1">
+                  <span>⚠️</span>
+                  <span>This content was detected as AI-generated with {post.ai_confidence || 'unknown'}% confidence</span>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Post footer */}

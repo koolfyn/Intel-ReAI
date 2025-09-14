@@ -204,12 +204,13 @@ export interface ContentDetectionResponse {
   is_ai_generated: boolean;
   confidence: number;
   detection_methods: Array<{
-    provider: string;
-    confidence: number;
-    details: string;
+    method: string;
+    indicator: string;
   }>;
   recommendations: Array<{
     action: string;
     reason: string;
   }>;
+  source?: string;
+  raw_response?: any;
 }

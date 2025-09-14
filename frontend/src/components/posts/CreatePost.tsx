@@ -15,6 +15,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ subreddit, onPostCreated }) => 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [moderationResult, setModerationResult] = useState<any>(null);
   const [showModeration, setShowModeration] = useState(false);
+  const [aiDetectionResult, setAiDetectionResult] = useState<any>(null);
+  const [showAiDetection, setShowAiDetection] = useState(false);
+  const [isDetectingAI, setIsDetectingAI] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,19 +69,25 @@ const CreatePost: React.FC<CreatePostProps> = ({ subreddit, onPostCreated }) => 
   const handleDetectAI = async () => {
     if (!content.trim()) return;
 
+    setIsDetectingAI(true);
     try {
       const result = await aiApi.detectContent({
         content: content.trim(),
         content_type: 'post',
       });
 
-      if (result.is_ai_generated) {
-        alert(`⚠️ AI Content Detected!\nConfidence: ${Math.round(result.confidence * 100)}%\nReason: ${result.recommendations[0]?.reason || 'Unknown'}`);
-      } else {
-        alert(`✅ Content appears to be human-generated\nConfidence: ${Math.round(result.confidence * 100)}%`);
-      }
+      setAiDetectionResult(result);
+      setShowAiDetection(true);
     } catch (error) {
       console.error('Error detecting AI content:', error);
+      setAiDetectionResult({
+        is_ai_generated: false,
+        confidence: 0,
+        recommendations: [{ action: 'error', reason: 'AI detection failed' }]
+      });
+      setShowAiDetection(true);
+    } finally {
+      setIsDetectingAI(false);
     }
   };
 
@@ -147,9 +156,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ subreddit, onPostCreated }) => 
             type="button"
             onClick={handleDetectAI}
             className="btn-secondary text-sm"
-            disabled={!content.trim()}
+            disabled={!content.trim() || isDetectingAI}
           >
-            🔍 Detect AI
+            {isDetectingAI ? '🔍 Detecting...' : '🔍 Detect AI'}
           </button>
         </div>
 
@@ -182,6 +191,58 @@ const CreatePost: React.FC<CreatePostProps> = ({ subreddit, onPostCreated }) => 
                     {moderationResult.rule_violations.map((violation: any, index: number) => (
                       <li key={index} className="text-xs text-red-600">
                         {violation.description}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* AI Detection Results */}
+        {showAiDetection && aiDetectionResult && (
+          <div className={`border rounded-md p-4 ${
+            aiDetectionResult.is_ai_generated
+              ? 'bg-yellow-50 border-yellow-200'
+              : 'bg-green-50 border-green-200'
+          }`}>
+            <h4 className={`font-medium mb-2 ${
+              aiDetectionResult.is_ai_generated
+                ? 'text-yellow-900'
+                : 'text-green-900'
+            }`}>
+              {aiDetectionResult.is_ai_generated ? '⚠️ AI Content Detected' : '✅ Human Content Detected'}
+            </h4>
+            <div className={`text-sm ${
+              aiDetectionResult.is_ai_generated
+                ? 'text-yellow-800'
+                : 'text-green-800'
+            }`}>
+              <p className="mb-2">
+                <strong>Confidence:</strong> {Math.round(aiDetectionResult.confidence * 100)}%
+              </p>
+
+              {aiDetectionResult.detection_methods && aiDetectionResult.detection_methods.length > 0 && (
+                <div className="mb-2">
+                  <strong>Detection Methods:</strong>
+                  <ul className="list-disc list-inside ml-2">
+                    {aiDetectionResult.detection_methods.map((method: any, index: number) => (
+                      <li key={index} className="text-xs">
+                        {method.indicator}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {aiDetectionResult.recommendations && aiDetectionResult.recommendations.length > 0 && (
+                <div>
+                  <strong>Recommendations:</strong>
+                  <ul className="list-disc list-inside ml-2">
+                    {aiDetectionResult.recommendations.map((rec: any, index: number) => (
+                      <li key={index} className="text-xs">
+                        <strong>{rec.action}:</strong> {rec.reason}
                       </li>
                     ))}
                   </ul>

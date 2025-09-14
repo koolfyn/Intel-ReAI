@@ -618,18 +618,27 @@ Make improvements while maintaining the original intent and community focus.
             }
 
     def _get_fallback_auto_mod_settings(self, moderation_style: str) -> Dict[str, Any]:
-        """Get fallback auto-moderation settings"""
+        """Get fallback auto-moderation settings with enhanced format"""
         base_settings = {
             "auto_remove_spam": True,
             "require_approval": False,
             "content_filters": ["spam", "offensive"],
             "min_account_age_hours": 0,
             "min_karma_required": 0,
-            "max_posts_per_hour": 10,
+            "max_posts_per_hour": 5,
+            "max_comments_per_hour": 20,
             "keyword_filters": [],
-            "image_moderation": False,
-            "link_validation": True,
-            "duplicate_detection": True
+            "domain_blacklist": [],
+            "user_blacklist": [],
+            "auto_approve_trusted_users": True,
+            "remove_duplicate_posts": True,
+            "remove_low_effort_posts": False,
+            "require_post_flair": False,
+            "require_comment_approval": False,
+            "auto_lock_controversial_posts": False,
+            "auto_remove_reported_content": True,
+            "rate_limit_new_users": True,
+            "require_email_verification": False
         }
 
         if moderation_style == "strict":
@@ -637,14 +646,22 @@ Make improvements while maintaining the original intent and community focus.
                 "require_approval": True,
                 "min_account_age_hours": 24,
                 "min_karma_required": 10,
-                "max_posts_per_hour": 5,
-                "content_filters": ["spam", "offensive", "low_effort"],
-                "image_moderation": True
+                "content_filters": ["spam", "offensive", "low_effort", "duplicate"],
+                "max_posts_per_hour": 3,
+                "max_comments_per_hour": 10,
+                "remove_low_effort_posts": True,
+                "require_post_flair": True,
+                "auto_lock_controversial_posts": True,
+                "rate_limit_new_users": True,
+                "require_email_verification": True
             })
         elif moderation_style == "lenient":
             base_settings.update({
                 "content_filters": ["spam"],
-                "max_posts_per_hour": 20
+                "max_posts_per_hour": 10,
+                "max_comments_per_hour": 50,
+                "auto_approve_trusted_users": True,
+                "rate_limit_new_users": False
             })
 
         return base_settings

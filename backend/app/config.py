@@ -11,6 +11,11 @@ class Settings:
     CLAUDE_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     CLAUDE_MODEL: str = "claude-3-5-haiku-20241022"
 
+    # Winston AI API
+    WINSTON_AI_API_KEY: str = os.getenv("WINSTON_AI_API_KEY", "")
+    WINSTON_AI_BASE_URL: str = "https://api.gowinston.ai/mcp/v1"
+    WINSTON_AI_ENABLED: bool = os.getenv("WINSTON_AI_ENABLED", "true").lower() == "true"
+
     # App settings
     APP_NAME: str = "AI-Native Reddit MVP"
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
