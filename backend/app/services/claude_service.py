@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 
 class ClaudeService:
     def __init__(self):
+        if not settings.CLAUDE_API_KEY:
+            raise ValueError("ANTHROPIC_API_KEY environment variable is required")
         self.client = anthropic.Anthropic(api_key=settings.CLAUDE_API_KEY)
         self.model = settings.CLAUDE_MODEL
 

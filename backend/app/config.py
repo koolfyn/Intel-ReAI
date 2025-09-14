@@ -8,8 +8,8 @@ class Settings:
     DATABASE_URL: str = "sqlite:///./reddit_mvp.db"
 
     # Claude API
-    CLAUDE_API_KEY: str = os.getenv("CLAUDE_API_KEY", "")
-    CLAUDE_MODEL: str = "claude-3-sonnet-20240229"
+    CLAUDE_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    CLAUDE_MODEL: str = "claude-3-5-haiku-20241022"
 
     # App settings
     APP_NAME: str = "AI-Native Reddit MVP"

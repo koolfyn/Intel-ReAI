@@ -26,18 +26,28 @@ const AICompanion: React.FC<AICompanionProps> = ({
     e.preventDefault();
     if (!query.trim()) return;
 
+    const currentQuery = query.trim();
     setIsLoading(true);
+    setResponse(null); // Clear current response
+
     try {
       const result = await aiApi.queryCompanion({
-        query: query.trim(),
+        query: currentQuery,
         subreddit_id: subredditId,
       });
 
-      setResponse(result);
-      setChatHistory(prev => [...prev, { query: query.trim(), response: result }]);
+      // Add to chat history immediately
+      setChatHistory(prev => [...prev, { query: currentQuery, response: result }]);
       setQuery('');
     } catch (error) {
       console.error('Error querying AI companion:', error);
+      // Add error to chat history
+      const errorResponse: AIQueryResponse = {
+        response: "I'm sorry, I encountered an error processing your request. Please try again.",
+        citations: [],
+        sources: []
+      };
+      setChatHistory(prev => [...prev, { query: currentQuery, response: errorResponse }]);
     } finally {
       setIsLoading(false);
     }
@@ -115,22 +125,51 @@ const AICompanion: React.FC<AICompanionProps> = ({
 
               {/* AI Response */}
               <div className="flex justify-start">
-                <div className="bg-gray-100 text-gray-900 rounded-lg px-4 py-2 max-w-xs">
-                  <p className="text-sm mb-2">{chat.response.response}</p>
+                <div className="bg-gray-100 text-gray-900 rounded-lg px-4 py-2 max-w-sm">
+                  <div className="text-sm mb-2 whitespace-pre-wrap">
+                    {chat.response.response}
+                  </div>
 
                   {/* Citations */}
                   {chat.response.citations && chat.response.citations.length > 0 && (
-                    <div className="mt-2 space-y-2">
-                      <p className="text-xs font-medium text-gray-600">Sources:</p>
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-medium text-gray-600 border-b border-gray-300 pb-1">
+                        📚 Sources ({chat.response.citations.length})
+                      </p>
                       {chat.response.citations.map((citation, idx) => (
-                        <div key={idx} className="text-xs bg-white p-2 rounded border">
-                          <p className="font-medium text-gray-800">{citation.post_title}</p>
-                          <p className="text-gray-600 mt-1">{citation.excerpt}</p>
-                          <p className="text-gray-400 mt-1">
-                            Relevance: {Math.round(citation.relevance_score * 100)}%
+                        <div key={idx} className="text-xs bg-white p-2 rounded border border-gray-200">
+                          <p className="font-medium text-gray-800 mb-1">{citation.post_title}</p>
+                          <p className="text-gray-600 text-xs leading-relaxed mb-1">
+                            "{citation.excerpt}"
                           </p>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-xs">
+                              Relevance: {Math.round(citation.relevance_score * 100)}%
+                            </span>
+                            <span className="text-blue-500 text-xs hover:underline cursor-pointer">
+                              View Post →
+                            </span>
+                          </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Sources */}
+                  {chat.response.sources && chat.response.sources.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs font-medium text-gray-600 mb-1">🔗 Quick Links:</p>
+                      <div className="space-y-1">
+                        {chat.response.sources.map((source, idx) => (
+                          <a
+                            key={idx}
+                            href={source.url}
+                            className="text-xs text-blue-600 hover:text-blue-800 hover:underline block"
+                          >
+                            {source.title}
+                          </a>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -138,30 +177,6 @@ const AICompanion: React.FC<AICompanionProps> = ({
             </div>
           ))}
 
-          {/* Current Response */}
-          {response && (
-            <div className="flex justify-start">
-              <div className="bg-gray-100 text-gray-900 rounded-lg px-4 py-2 max-w-xs">
-                <p className="text-sm mb-2">{response.response}</p>
-
-                {/* Citations */}
-                {response.citations && response.citations.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-xs font-medium text-gray-600">Sources:</p>
-                    {response.citations.map((citation, idx) => (
-                      <div key={idx} className="text-xs bg-white p-2 rounded border">
-                        <p className="font-medium text-gray-800">{citation.post_title}</p>
-                        <p className="text-gray-600 mt-1">{citation.excerpt}</p>
-                        <p className="text-gray-400 mt-1">
-                          Relevance: {Math.round(citation.relevance_score * 100)}%
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Loading State */}
           {isLoading && (

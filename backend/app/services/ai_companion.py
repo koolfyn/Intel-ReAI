@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from ..models import Post, Subreddit, Comment
 from .claude_service import ClaudeService
+from .rag_orchestrator import RAGOrchestrator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -9,6 +10,7 @@ logger = logging.getLogger(__name__)
 class AICompanionService:
     def __init__(self):
         self.claude_service = ClaudeService()
+        self.rag_orchestrator = RAGOrchestrator()
 
     async def query_companion(
         self,
@@ -17,49 +19,14 @@ class AICompanionService:
         context: Optional[str] = None,
         db: Session = None
     ) -> Dict[str, Any]:
-        """Query the AI companion with context from posts and comments"""
+        """Query the AI companion using the enhanced RAG pipeline"""
         try:
-            # Get relevant posts based on query
-            if subreddit_id:
-                posts = db.query(Post).filter(Post.subreddit_id == subreddit_id).all()
-            else:
-                posts = db.query(Post).all()
-
-            # Get relevant comments
-            comments = []
-            for post in posts[:10]:  # Limit to avoid too much context
-                post_comments = db.query(Comment).filter(Comment.post_id == post.id).limit(5).all()
-                comments.extend(post_comments)
-
-            # Format posts for AI
-            formatted_posts = []
-            for post in posts[:10]:
-                formatted_posts.append({
-                    "id": post.id,
-                    "title": post.title,
-                    "content": post.content,
-                    "author": post.author.username,
-                    "score": post.score,
-                    "created_at": post.created_at.isoformat()
-                })
-
-            # Format comments for AI
-            formatted_comments = []
-            for comment in comments[:20]:
-                formatted_comments.append({
-                    "id": comment.id,
-                    "content": comment.content,
-                    "author": comment.author.username,
-                    "post_id": comment.post_id,
-                    "score": comment.score,
-                    "created_at": comment.created_at.isoformat()
-                })
-
-            # Use Claude service to search and respond
-            result = await self.claude_service.search_and_respond(
+            # Use the new RAG orchestrator for improved retrieval and response
+            result = await self.rag_orchestrator.process_query(
                 query=query,
-                posts=formatted_posts,
-                comments=formatted_comments
+                subreddit_id=subreddit_id,
+                context=context,
+                db=db
             )
 
             return result
