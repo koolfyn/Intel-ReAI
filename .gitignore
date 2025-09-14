@@ -64,6 +64,8 @@ frontend/.env.production.local
 ehthumbs.db
 Thumbs.db
 
+reddit_mvp.db
+
 # Logs
 *.log
 logs/
