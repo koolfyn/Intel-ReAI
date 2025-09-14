@@ -3,6 +3,11 @@ proc# AI-Native Reddit MVP - Engineering Document
 ## Project Overview
 A mock-off Reddit platform with AI-native features including an AI companion, content moderation, and automated subreddit configuration.
 
+## Environment Setup
+1. Copy `.env.example` to `.env`
+2. Fill in your actual API keys
+3. Never commit `.env` files to git
+
 ## Cursor Rule:
 ROLE: You are an expert full-stack developer.
 
