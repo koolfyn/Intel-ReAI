@@ -129,3 +129,6 @@ jspm_packages/
 # Temporary folders
 tmp/
 temp/
+backend/.env
+frontend/.env
+frontend/.env.local
