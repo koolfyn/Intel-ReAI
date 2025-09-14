@@ -27,73 +27,62 @@ async def search_posts(
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """Search posts using SQLite FTS5"""
+    """Search posts using simple LIKE search (lightweight implementation)"""
     if not q.strip():
         raise HTTPException(status_code=400, detail="Search query cannot be empty")
 
-    # Build the search query
+    # Build the search query using simple LIKE search
+    search_filter = f"%{q}%"
+
     if subreddit:
         # Search within specific subreddit
         subreddit_obj = db.query(Subreddit).filter(Subreddit.name == subreddit).first()
         if not subreddit_obj:
             raise HTTPException(status_code=404, detail="Subreddit not found")
 
-        query = text("""
-            SELECT p.id, p.title, p.content, p.upvotes, p.downvotes, p.created_at,
-                   u.username, u.display_name, s.name as subreddit_name, s.display_name as subreddit_display_name
-            FROM posts_fts fts
-            JOIN posts p ON fts.content_rowid = p.id
-            JOIN users u ON p.author_id = u.id
-            JOIN subreddits s ON p.subreddit_id = s.id
-            WHERE posts_fts MATCH :query AND p.subreddit_id = :subreddit_id
-        """)
-        params = {"query": q, "subreddit_id": subreddit_obj.id}
+        query = db.query(Post).filter(
+            Post.subreddit_id == subreddit_obj.id,
+            (Post.title.ilike(f'%{q}%') | Post.content.ilike(f'%{q}%'))
+        )
     else:
         # Search all posts
-        query = text("""
-            SELECT p.id, p.title, p.content, p.upvotes, p.downvotes, p.created_at,
-                   u.username, u.display_name, s.name as subreddit_name, s.display_name as subreddit_display_name
-            FROM posts_fts fts
-            JOIN posts p ON fts.content_rowid = p.id
-            JOIN users u ON p.author_id = u.id
-            JOIN subreddits s ON p.subreddit_id = s.id
-            WHERE posts_fts MATCH :query
-        """)
-        params = {"query": q}
+        query = db.query(Post).filter(
+            Post.title.ilike(f'%{q}%') | Post.content.ilike(f'%{q}%')
+        )
 
     # Apply sorting
     if sort == "date":
-        query = text(str(query) + " ORDER BY p.created_at DESC")
+        query = query.order_by(Post.created_at.desc())
     elif sort == "score":
-        query = text(str(query) + " ORDER BY (p.upvotes - p.downvotes) DESC")
-    else:  # relevance
-        query = text(str(query) + " ORDER BY rank")
+        query = query.order_by((Post.upvotes - Post.downvotes).desc())
+    else:  # relevance - order by score for now
+        query = query.order_by((Post.upvotes - Post.downvotes).desc())
+
+    # Get total count
+    total = query.count()
 
     # Apply pagination
     offset = (page - 1) * limit
-    query = text(str(query) + f" LIMIT {limit} OFFSET {offset}")
-
-    # Execute query
-    result = db.execute(query, params).fetchall()
+    posts_result = query.offset(offset).limit(limit).all()
 
     # Format results
     posts = []
-    for row in result:
+    for post in posts_result:
         posts.append({
-            "id": row.id,
-            "title": row.title,
-            "content": row.content,
+            "id": post.id,
+            "title": post.title,
+            "content": post.content,
             "type": "post",
             "author": {
-                "username": row.username,
-                "display_name": row.display_name
+                "username": post.author.username,
+                "display_name": post.author.display_name
             },
             "subreddit": {
-                "name": row.subreddit_name,
-                "display_name": row.subreddit_display_name
+                "name": post.subreddit.name,
+                "display_name": post.subreddit.display_name
             },
-            "score": row.upvotes - row.downvotes,
-            "created_at": row.created_at.isoformat()
+            "score": post.upvotes - post.downvotes,
+            "created_at": post.created_at.isoformat()
         })
 
     return {
@@ -102,7 +91,8 @@ async def search_posts(
         "pagination": {
             "page": page,
             "limit": limit,
-            "total": len(posts)  # This is approximate for FTS5
+            "total": total,
+            "pages": (total + limit - 1) // limit
         }
     }
 
@@ -165,79 +155,72 @@ async def advanced_search(
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """Advanced search with multiple filters"""
+    """Advanced search with multiple filters using simple LIKE search"""
     if not q.strip():
         raise HTTPException(status_code=400, detail="Search query cannot be empty")
 
     # Start with basic search
-    query = text("""
-        SELECT p.id, p.title, p.content, p.upvotes, p.downvotes, p.created_at,
-               u.username, u.display_name, s.name as subreddit_name, s.display_name as subreddit_display_name
-        FROM posts_fts fts
-        JOIN posts p ON fts.content_rowid = p.id
-        JOIN users u ON p.author_id = u.id
-        JOIN subreddits s ON p.subreddit_id = s.id
-        WHERE posts_fts MATCH :query
-    """)
-
-    params = {"query": q}
+    query = db.query(Post).filter(
+        Post.title.ilike(f'%{q}%') | Post.content.ilike(f'%{q}%')
+    )
 
     # Add filters
-    filters = []
     if subreddit:
         subreddit_obj = db.query(Subreddit).filter(Subreddit.name == subreddit).first()
         if not subreddit_obj:
             raise HTTPException(status_code=404, detail="Subreddit not found")
-        filters.append("p.subreddit_id = :subreddit_id")
-        params["subreddit_id"] = subreddit_obj.id
+        query = query.filter(Post.subreddit_id == subreddit_obj.id)
 
     if author:
         author_obj = db.query(User).filter(User.username == author).first()
         if not author_obj:
             raise HTTPException(status_code=404, detail="Author not found")
-        filters.append("p.author_id = :author_id")
-        params["author_id"] = author_obj.id
+        query = query.filter(Post.author_id == author_obj.id)
 
     if date_from:
-        filters.append("p.created_at >= :date_from")
-        params["date_from"] = date_from
+        from datetime import datetime
+        try:
+            date_from_obj = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(Post.created_at >= date_from_obj)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date_from format. Use YYYY-MM-DD")
 
     if date_to:
-        filters.append("p.created_at <= :date_to")
-        params["date_to"] = date_to
+        from datetime import datetime
+        try:
+            date_to_obj = datetime.strptime(date_to, "%Y-%m-%d")
+            query = query.filter(Post.created_at <= date_to_obj)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date_to format. Use YYYY-MM-DD")
 
-    # Apply filters
-    if filters:
-        query = text(str(query) + " AND " + " AND ".join(filters))
+    # Order by score (relevance)
+    query = query.order_by((Post.upvotes - Post.downvotes).desc())
 
-    # Order by relevance
-    query = text(str(query) + " ORDER BY rank")
+    # Get total count
+    total = query.count()
 
     # Apply pagination
     offset = (page - 1) * limit
-    query = text(str(query) + f" LIMIT {limit} OFFSET {offset}")
-
-    # Execute query
-    result = db.execute(query, params).fetchall()
+    posts_result = query.offset(offset).limit(limit).all()
 
     # Format results
     posts = []
-    for row in result:
+    for post in posts_result:
         posts.append({
-            "id": row.id,
-            "title": row.title,
-            "content": row.content,
+            "id": post.id,
+            "title": post.title,
+            "content": post.content,
             "type": "post",
             "author": {
-                "username": row.username,
-                "display_name": row.display_name
+                "username": post.author.username,
+                "display_name": post.author.display_name
             },
             "subreddit": {
-                "name": row.subreddit_name,
-                "display_name": row.subreddit_display_name
+                "name": post.subreddit.name,
+                "display_name": post.subreddit.display_name
             },
-            "score": row.upvotes - row.downvotes,
-            "created_at": row.created_at.isoformat()
+            "score": post.upvotes - post.downvotes,
+            "created_at": post.created_at.isoformat()
         })
 
     return {
@@ -252,6 +235,7 @@ async def advanced_search(
         "pagination": {
             "page": page,
             "limit": limit,
-            "total": len(posts)
+            "total": total,
+            "pages": (total + limit - 1) // limit
         }
     }

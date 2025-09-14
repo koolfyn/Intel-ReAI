@@ -3,6 +3,33 @@ proc# AI-Native Reddit MVP - Engineering Document
 ## Project Overview
 A mock-off Reddit platform with AI-native features including an AI companion, content moderation, and automated subreddit configuration.
 
+## Cursor Rule:
+ROLE: You are an expert full-stack developer.
+
+OBJECTIVE: Implement a lightweight keyword search feature, connecting the existing frontend UI component to a new backend endpoint.
+
+WORKFLOW & RULES:
+
+One Action per Response: Execute only a single, byte-sized task in each response.
+
+Await Confirmation: After completing a task, STOP and wait for my explicit review and approval ("continue", "proceed", etc.) before starting the next task.
+
+For each change, update the engineering document inside the AGENT folder correspondingly and change any relevant section to keep the document up-to-date.
+
+DO NOT return the task to user until you have make sure that the task is complete and the provided solution is reasonable.
+
+DO plan extensively before making any function calls to use any external tools.
+
+If the user query's intention is not clear, either reformat the query or ask user to clarify before proceeding, and DO NOT produce outputs solely based on context-inferred informations.
+
+Provide Impact Analysis: For every code modification, include a section titled analyzing how the changes affect other components or features. Then use this information in the context.
+
+Provide Design Rationale: For every implementation choice, Briefly explain and justify your decision by answering:
+- Is this approach suitable for our current Minimum Viable Product (MVP)?
+- What are the potential impacts on future scalability and maintenance?
+
+Assume Context: You have access to the entire project's file structure and code. When providing code, specify the full file path and show only the modified or new code blocks for clarity.
+
 ## Tech Stack
 
 ### Backend
@@ -169,22 +196,22 @@ Intel-ReAI/
 **Goal**: Basic Reddit functionality without AI features
 
 #### Tasks:
-1. **Backend Setup** ✅
+1. **Backend Setup** ✅ COMPLETED
    - [x] Initialize FastAPI project structure
    - [x] Set up SQLite database with SQLAlchemy (simplified for MVP)
    - [x] Create fake user system (no authentication for MVP)
    - [x] Implement basic CRUD for posts and comments
    - [x] Add subreddit management
-   - [x] Set up basic search functionality with SQLite FTS5
+   - [x] Set up basic search functionality with lightweight keyword search
 
-2. **Frontend Setup** ✅i
+2. **Frontend Setup** 🔄 IN PROGRESS
    - [x] Initialize React project with TypeScript
    - [x] Set up Tailwind CSS and component library
    - [x] Create basic routing structure
    - [x] Create type definitions
    - [x] Build home page with post listing
    - [x] Create subreddit and post detail pages
-   - [x] Create AI companion components
+   - [] Create AI companion components
 
 3. **Testing** 🔄 IN PROGRESS
    - [x] Write unit tests for posts API endpoints
@@ -197,43 +224,43 @@ Intel-ReAI/
 #### Tasks:
 1. **AI Companion** ✅
    - [x] Set up Claude API integration
-   - [x] Implement basic AI companion service
-   - [x] Create AI companion API endpoints
-   - [x] Implement simplified post search for AI context
-   - [x] Create AI companion UI component
-   - [x] Build semantic search over posts
-   - [x] Add citation system for AI responses
+   - [ ] Implement basic AI companion service
+   - [ ] Create AI companion API endpoints
+   - [ ] Implement simplified post search for AI context
+   - [ ] Create AI companion UI component
+   - [ ] Build semantic search over posts
+   - [ ] Add citation system for AI responses
 
 2. **Content Moderation** ✅
-   - [x] Integrate Claude API for content analysis
-   - [x] Create content moderation service
-   - [x] Create moderation API endpoints
-   - [x] Create moderation suggestions UI
-   - [x] Implement pre-publish content checking
-   - [x] Add rule-based filtering
+   - [ ] Integrate Claude API for content analysis
+   - [ ] Create content moderation service
+   - [ ] Create moderation API endpoints
+   - [ ] Create moderation suggestions UI
+   - [ ] Implement pre-publish content checking
+   - [ ] Add rule-based filtering
 
 3. **Testing** 🔄 IN PROGRESS
-   - [x] Test AI companion functionality
-   - [x] Test content moderation accuracy
+   - [] Test AI companion functionality
+   - [] Test content moderation accuracy
    - [ ] Performance testing for AI features
 
 ### Phase 3: Advanced AI Features (Week 3) ✅ COMPLETED
 **Goal**: Auto-configuration and content detection
 
 #### Tasks:
-1. **Auto Subreddit Configuration** ✅
-   - [x] Build AI-powered subreddit setup service
-   - [x] Generate mod rules and descriptions using Claude
-   - [x] Create auto-configuration API endpoints
-   - [x] Create configuration UI components
-   - [x] Create configuration templates
+1. **Auto Subreddit Configuration** 🔄 IN PROGRESS
+   - [ ] Build AI-powered subreddit setup service
+   - [ ] Generate mod rules and descriptions using Claude
+   - [ ] Create auto-configuration API endpoints
+   - [ ] Create configuration UI components
+   - [ ] Create configuration templates
 
-2. **Content Detection** ✅
-   - [x] Integrate Claude API for content detection
-   - [x] Create content detection service
-   - [x] Create content detection API endpoints
-   - [x] Create content flagging system UI
-   - [x] Build detection dashboard
+2. **Content Detection** 🔄 IN PROGRESS
+   - [ ] Integrate Claude API for content detection
+   - [ ] Create content detection service
+   - [ ] Create content detection API endpoints
+   - [ ] Create content flagging system UI
+   - [ ] Build detection dashboard
 
 3. **Testing** 🔄 IN PROGRESS
    - [x] Test auto-configuration accuracy
@@ -379,6 +406,38 @@ AWS_S3_BUCKET=your-bucket-name
 - **AI Accuracy**: Continuous testing and model fine-tuning
 - **Content Detection False Positives**: User feedback loop and threshold tuning
 - **Scalability**: Load testing and horizontal scaling preparation
+
+## Search Implementation Details
+
+### Current Implementation (Phase 1 - Completed)
+The search functionality has been implemented as a lightweight keyword search system using SQLAlchemy's `ilike` method for case-insensitive pattern matching.
+
+**Features:**
+- **Post Search** (`/api/v1/search/posts`): Search posts by title and content
+- **Subreddit Search** (`/api/v1/search/subreddits`): Search subreddits by name, display name, and description
+- **Advanced Search** (`/api/v1/search/advanced`): Search with filters (subreddit, author, date range)
+- **Case-insensitive matching**: Uses `ilike` for better user experience
+- **Pagination**: All endpoints support pagination with configurable page size
+- **Sorting**: Posts can be sorted by relevance (score), date, or score
+
+**Technical Details:**
+- Uses SQLAlchemy ORM for database queries
+- Implements proper error handling and validation
+- Returns consistent response format with pagination metadata
+- Leverages existing model relationships for efficient data retrieval
+
+**API Endpoints:**
+```
+GET /api/v1/search/posts?q={query}&subreddit={name}&sort={relevance|date|score}&page={n}&limit={n}
+GET /api/v1/search/subreddits?q={query}&page={n}&limit={n}
+GET /api/v1/search/advanced?q={query}&subreddit={name}&author={username}&date_from={YYYY-MM-DD}&date_to={YYYY-MM-DD}&page={n}&limit={n}
+```
+
+**Future Enhancements (Phase 4):**
+- Upgrade to full-text search with SQLite FTS5 for better performance
+- Add search result highlighting
+- Implement search suggestions/autocomplete
+- Add search analytics and trending topics
 
 ## Next Steps
 
