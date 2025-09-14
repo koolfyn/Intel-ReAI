@@ -18,3 +18,4 @@ class User(Base):
     posts = relationship("Post", back_populates="author")
     comments = relationship("Comment", back_populates="author")
     moderated_subreddits = relationship("Subreddit", back_populates="moderators")
+    search_history = relationship("SearchHistory", back_populates="user")

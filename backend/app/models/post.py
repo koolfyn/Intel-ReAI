@@ -10,6 +10,7 @@ class Post(Base):
     title = Column(String(200), nullable=False)
     content = Column(Text, nullable=False)
     post_type = Column(String(20), default="text")  # text, link, image
+    label = Column(String(100), nullable=True)  # Custom label for posts
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     subreddit_id = Column(Integer, ForeignKey("subreddits.id"), nullable=False)
     upvotes = Column(Integer, default=0)

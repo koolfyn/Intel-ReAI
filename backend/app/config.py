@@ -9,6 +9,7 @@ class Settings:
 
     # Claude API
     CLAUDE_API_KEY: str = os.getenv("CLAUDE_API_KEY", "")
+    ANTHROPIC_API_KEY: str = os.getenv("CLAUDE_API_KEY", "")  # Use same key for both
     CLAUDE_MODEL: str = "claude-3-sonnet-20240229"
 
     # App settings

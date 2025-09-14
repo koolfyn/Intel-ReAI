@@ -20,6 +20,7 @@ class SearchResult(BaseModel):
 
 @router.get("/search/posts")
 async def search_posts(
+    
     q: str = Query(..., description="Search query"),
     subreddit: Optional[str] = Query(None, description="Filter by subreddit name"),
     sort: str = Query("relevance", regex="^(relevance|date|score)$"),

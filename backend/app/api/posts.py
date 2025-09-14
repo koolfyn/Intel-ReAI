@@ -14,6 +14,7 @@ class PostResponse(BaseModel):
     title: str
     content: str
     post_type: str
+    label: Optional[str]
     author: dict
     subreddit: dict
     upvotes: int
@@ -30,10 +31,12 @@ class PostCreate(BaseModel):
     content: str
     subreddit_id: int
     post_type: str = "text"
+    label: Optional[str] = None
 
 class PostUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
+    label: Optional[str] = None
 
 @router.get("/posts/", response_model=dict)
 async def get_posts(
@@ -72,6 +75,7 @@ async def get_posts(
             "title": post.title,
             "content": post.content,
             "post_type": post.post_type,
+            "label": post.label,
             "author": {
                 "id": post.author.id,
                 "username": post.author.username,
@@ -114,6 +118,7 @@ async def get_post(post_id: int, db: Session = Depends(get_db)):
         title=post.title,
         content=post.content,
         post_type=post.post_type,
+        label=post.label,
         author={
             "id": post.author.id,
             "username": post.author.username,
@@ -151,6 +156,7 @@ async def create_post(post_data: PostCreate, db: Session = Depends(get_db)):
         title=post_data.title,
         content=post_data.content,
         post_type=post_data.post_type,
+        label=post_data.label,
         author_id=author.id,
         subreddit_id=post_data.subreddit_id
     )
@@ -164,6 +170,7 @@ async def create_post(post_data: PostCreate, db: Session = Depends(get_db)):
         title=post.title,
         content=post.content,
         post_type=post.post_type,
+        label=post.label,
         author={
             "id": post.author.id,
             "username": post.author.username,
@@ -199,6 +206,8 @@ async def update_post(
         post.title = post_data.title
     if post_data.content is not None:
         post.content = post_data.content
+    if post_data.label is not None:
+        post.label = post_data.label
 
     post.updated_at = datetime.utcnow()
     db.commit()
@@ -209,6 +218,7 @@ async def update_post(
         title=post.title,
         content=post.content,
         post_type=post.post_type,
+        label=post.label,
         author={
             "id": post.author.id,
             "username": post.author.username,

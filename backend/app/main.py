@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import init_db
-from .api import posts, comments, subreddits, search, ai
+from .api import posts, comments, subreddits, search, ai, recommendation
+from .services import summarizer
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -25,6 +26,8 @@ app.include_router(comments.router, prefix="/api/v1", tags=["comments"])
 app.include_router(subreddits.router, prefix="/api/v1", tags=["subreddits"])
 app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(ai.router, prefix="/api/v1", tags=["ai"])
+app.include_router(recommendation.router, prefix="/api/v1", tags=["recommendation"])
+app.include_router(summarizer.router, prefix="/api/v1", tags=["summarizer"])
 
 @app.on_event("startup")
 async def startup_event():
